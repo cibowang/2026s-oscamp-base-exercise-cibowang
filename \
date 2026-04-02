@@ -8,7 +8,8 @@
 // - `Receiver::recv()` receives a message
 // - Multiple producers can be created via `Sender::clone()`
 
-use std::sync::mpsc::{channel, Sender};
+use std::sync::mpsc::{self, channel, Sender};
+use std::{string, thread};
 
 // Create a producer thread that sends each element from items into the channel.
 // The main thread receives all messages and returns them.
@@ -18,18 +19,16 @@ pub fn simple_send_recv(items: Vec<String>) -> Vec<String> {
     // TODO: In main thread, receive all messages and collect into Vec
     // Hint: When all Senders are dropped, recv() returns Err
     let (tx, rx) = channel();
-    std::thread::spawn(move || {
-        for item in items {
-            tx.send(item).unwrap()
+    thread::spawn(move || {
+        for s in items.into_iter().collect::<Vec<String>>() {
+            tx.send(s).unwrap();
         }
     });
-    // one sender no need to recv() result?
-    // also no thread join needed
-    rx.iter().collect()
+    rx.recv().into_iter().collect::<Vec<_>>()
 }
 
 // Create `n_producers` producer threads, each sending a message in format `"msg from {id}"`.
-// Collect all messages, sort them lexicograprically, and return.
+// Collect all messages, sort them lexicographically, and return.
 //
 // Hint: Use `tx.clone()` to create multiple senders. Note that the original tx must also be dropped.
 pub fn multi_producer(n_producers: usize) -> Vec<String> {
@@ -38,19 +37,17 @@ pub fn multi_producer(n_producers: usize) -> Vec<String> {
     // TODO: Remember to drop the original sender, otherwise receiver won't finish
     // TODO: Collect all messages and sort
     let (tx, rx) = channel();
-    for id in 0..n_producers {
-        let tx = Sender::clone(&tx);
-        let handle = std::thread::spawn(move || {
-            tx.send(format!("msg from {id}")).unwrap();
-        });
-        handle.join().unwrap();
+    let vec_msgs: Vec<String> = Vec::new();
+    for _ in vec_msgs.into_iter().collect::<Vec<String>>() {
+        for id in 0..n_producers {
+            let tx = Sender::clone(&tx);
+            std::thread::spawn(move || {
+                let _ = tx.send(format!("msg from {id}"));
+            });
+        }
     }
     drop(tx);
-
-    let mut res = rx.into_iter().collect::<Vec<_>>();
-    // cannot pipe sort() to rx!
-    res.sort();
-    res
+    rx.recv().into_iter().collect()
 }
 
 #[cfg(test)]
